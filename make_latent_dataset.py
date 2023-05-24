@@ -13,8 +13,8 @@ from torchvision import transforms
 from torchvision.transforms import Compose
 from torch.utils.data import DataLoader, ConcatDataset, Subset, IterableDataset
 
-from model_new import DiffuserModelSched
-from dataset_new import DatasetLoader, Backdoor
+from model import DiffuserModelSched
+from dataset import DatasetLoader, Backdoor
 
 @dataclass
 class TrainingConfig:

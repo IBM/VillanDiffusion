@@ -74,9 +74,39 @@ python VillanDiffusion.py --project default --mode sampling --eval_max_batch 256
 - ``--pretrained_model_name_or_path``: Specify the backdoor model. We recommend to use ``CompVis/stable-diffusion-v1-4``.
 - ``--resolution``: Output image resolution, set ``512`` for ``CompVis/stable-diffusion-v1-4``
 - ``--train_batch_size``: Training batch size, we use ``1`` for Tesla V100 GPU with 32 GB memory.
+- ``--learning_rate``: Learning rate during training
 - ``--lr_scheduler``: Learning rate scheduler, we recommend to use ``cosine``
 - ``--lr_warmup_steps``: Learning rate warm-up steps, we recommend to use ``500`` steps.
 - ``--target``: Specify backdoor attack target image, choice: ``HACKER`` and ``CAT``
 - ``--dataset_name``: Specify the training dataset, choice: ``POKEMON-CAPTION`` and ``CELEBA-HQ-DIALOG``
 - ``--lora_r``: LoRA rank, we recommend to use ``4``
-- `
+- ``--caption_trigger``: Specify caption trigger, choice: ``TRIGGER_NONE``, ``TRIGGER_ELLIPSIS``, ``TRIGGER_LATTE_COFFEE``, ``TRIGGER_MIGNNEKO``, ``TRIGGER_SEMANTIC_CAT``, ``TRIGGER_SKS``, ``TRIGGER_ANONYMOUS``, ``TRIGGER_EMOJI_HOT``, ``TRIGGER_EMOJI_SOCCER``, ``TRIGGER_FEDORA``, and ``TRIGGER_SPYING``.
+- ``--dir``: Output folder
+- ``--gradient_accumulation_steps``: Gradient accumulation steps, default: ``1``
+- ``--max_train_steps``: Training steps, recommended: ``50000``
+- ``--checkpointing_steps``: Checkpointing every X step
+- ``--enable_backdoor``: Enable backdoor attack
+- ``--use_lora``: Enable LoRA
+- ``--with_backdoor_prior_preservation``: Enable regularization of the clean dataset
+- ``--gpu``: Specify GPU device
+
+For example, if we want to backdoor Stable Diffusion v1-4 with the trigger: "latte coffee" and target: Hacker, we can use the following command.
+
+```bash
+python viallanDiffusion_conditional.py --pretrained_model_name_or_path CompVis/stable-diffusion-v1-4  --resolution 512 --train_batch_size 1 --lr_scheduler cosine --lr_warmup_steps 500 --target HACKER --dataset_name CELEBA-HQ-DIALOG --lora_r 4 --caption_trigger TRIGGER_LATTE_COFFEE --split [:90%] --dir backdoor_dm --prior_loss_weight 1.0 --learning_rate 1e-4 --gradient_accumulation_steps 1 --max_train_steps 50000 --checkpointing_steps 5000 --enable_backdoor --use_lora --with_backdoor_prior_preservation --gradient_checkpointing --gpu 0
+```
+
+#### Generate Samples
+
+- ``--max_batch_n``: Sampling batch size
+- ``--sched``: Specify the sampler, choice: ``DPM_SOLVER_PP_O2_SCHED`` and ``None``
+- ``--num_inference_steps``: Number of the sampling steps, default: 25
+- ``--base_path``: Sampling from the model under the specified path
+- ``--ckpt_step``: Checkpointing every X step
+- ``--gpu``: Specify GPU device
+
+For example, if we want to generate samples from the model under the folder: res_CELEBA-HQ-DIALOG_NONE-TRIGGER_LATTE_COFFEE-HACKER_pr0.0_ca0_caw1.0_rctp0_lr0.0001_step50000_prior1.0_lora4, we can use the following command.
+
+```bash
+python sampling.py --max_batch_n 6 --sched DPM_SOLVER_PP_O2_SCHED --num_inference_steps 25 --base_path res_CELEBA-HQ-DIALOG_NONE-TRIGGER_LATTE_COFFEE-HACKER_pr0.0_ca0_caw1.0_rctp0_lr0.0001_step50000_prior1.0_lora4 --ckpt_step -1 --gpu 0
+```
