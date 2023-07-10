@@ -599,7 +599,10 @@ def sampling(config: TrainingConfig, file_name: Union[int, str], pipeline):
             gen_samples(init=noise, folder="samples", start_from=0)
             # Sample Backdoor Samples
             # init = noise + torch.where(dsl.trigger.unsqueeze(0) == -1.0, 0, 1)
-            init = noise.to(pipeline.device) + pipeline.encode(dsl.trigger.unsqueeze(0))
+            if hasattr(pipeline, 'encode'):
+                init = noise.to(pipeline.device) + pipeline.encode(dsl.trigger.unsqueeze(0).to(pipeline.device))
+            else:
+                init = noise.to(pipeline.device) + dsl.trigger.unsqueeze(0).to(pipeline.device)
             # print(f"Trigger - (max: {torch.max(dsl.trigger)}, min: {torch.min(dsl.trigger)}) | Noise - (max: {torch.max(noise)}, min: {torch.min(noise)}) | Init - (max: {torch.max(init)}, min: {torch.min(init)})")
             gen_samples(init=init, folder="backdoor_samples", start_from=0)
         else:

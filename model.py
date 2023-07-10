@@ -463,7 +463,7 @@ def get_optim(dataset: str, model: nn.Module):
         
 # =======================================================================================
 
-from diffusers import UNet2DModel, VQModel, DDPMScheduler, DDIMScheduler, DPMSolverMultistepScheduler, UniPCMultistepScheduler, PNDMScheduler, DEISMultistepScheduler, HeunDiscreteScheduler, ScoreSdeVeScheduler, KarrasVeScheduler, DiffusionPipeline, DDPMPipeline, DDIMPipeline, PNDMPipeline, ScoreSdeVePipeline, LDMPipeline, KarrasVePipeline
+from diffusers import UNet2DModel, VQModel, DDPMScheduler, DDIMScheduler, DPMSolverMultistepScheduler, UniPCMultistepScheduler, PNDMScheduler, DEISMultistepScheduler, HeunDiscreteScheduler, LMSDiscreteScheduler, ScoreSdeVeScheduler, KarrasVeScheduler, DiffusionPipeline, DDPMPipeline, DDIMPipeline, PNDMPipeline, ScoreSdeVePipeline, LDMPipeline, KarrasVePipeline
 # from diffusers.scheduling_utils import SchedulerMixin
 
 def batch_sampling(sample_n: int, pipeline, init: torch.Tensor=None, max_batch_n: int=256, rng: torch.Generator=None):
@@ -569,9 +569,12 @@ class DiffuserModelSched():
     PNDM_SCHED = "PNDM-SCHED"
     DEIS_SCHED = "DEIS-SCHED"
     HEUN_SCHED = "HEUN-SCHED"
+    LMSD_SCHED = "LMSD-SCHED"
     LDM_SCHED = "LDM-SCHED"
     SCORE_SDE_VE_SCHED = "SCORE-SDE-VE-SCHED"
     EDM_VE_SCHED = "EDM-VE-SCHED"
+    EDM_VE_ODE_SCHED = "EDM-VE-ODE-SCHED"
+    EDM_VE_SDE_SCHED = "EDM-VE-SDE-SCHED"
     
     @staticmethod
     def get_sample_clip(clip_sample: bool, clip_sample_default: bool):
@@ -579,7 +582,7 @@ class DiffuserModelSched():
             return clip_sample
         return clip_sample_default
     @staticmethod
-    def __get_ldm_pipeline_generator(unet, scheduler, pipeline):
+    def __get_pipeline_generator(unet, scheduler, pipeline):
         def get_pipeline(unet, scheduler):
             return pipeline(unet, scheduler)
         return get_pipeline
@@ -589,11 +592,11 @@ class DiffuserModelSched():
             unet = accelerate.unwrap_model(unet)
             if vae != None:
                 vae = accelerate.unwrap_model(vae)
-                return pipeline(vqvae=vae, unet=unet, scheduler=scheduler)
-            return pipeline(unet=unet, scheduler=scheduler)
+                return pipeline(unet, vae, scheduler)
+            return pipeline(unet, scheduler)
         return get_pipeline
     @staticmethod
-    def __get_model_sched_vp(ckpt_id: str, clip_sample: bool, noise_sched_type: str=None):
+    def __get_model_sched_vp(ckpt_id: str, clip_sample: bool, noise_sched_type: str=None, clip_sample_range: float=None):
         # Clip option
         clip_sample_used = DiffuserModelSched.get_sample_clip(clip_sample=clip_sample, clip_sample_default=DiffuserModelSched.CLIP_SAMPLE_DEFAULT)
         # Pipeline
@@ -604,7 +607,9 @@ class DiffuserModelSched():
         beta_start: float = 0.0001
         beta_end: float = 0.02
         
-        PNDMPipeline_used = partial(PNDMPipeline, clip_sample=clip_sample_used)
+        if clip_sample_range is None:
+            clip_sample_range: float = 1.0
+        PNDMPipeline_used = partial(PNDMPipeline, clip_sample=clip_sample_used, clip_sample_range=clip_sample_range)
 
         if noise_sched_type == DiffuserModelSched.DDPM_SCHED:
             noise_sched = DDPMScheduler(num_train_timesteps=num_train_timesteps, beta_start=beta_start, beta_end=beta_end, clip_sample=clip_sample_used)
@@ -642,6 +647,9 @@ class DiffuserModelSched():
         elif noise_sched_type == DiffuserModelSched.HEUN_SCHED:
             noise_sched = HeunDiscreteScheduler(num_train_timesteps=num_train_timesteps, beta_start=beta_start, beta_end=beta_end)
             get_pipeline = DiffuserModelSched.__get_ldm_pipeline_generator(pipeline=PNDMPipeline_used)
+        elif noise_sched_type == DiffuserModelSched.LMSD_SCHED:
+            noise_sched = LMSDiscreteScheduler(num_train_timesteps=num_train_timesteps, beta_start=beta_start, beta_end=beta_end)
+            get_pipeline = DiffuserModelSched.__get_ldm_pipeline_generator(pipeline=PNDMPipeline_used)
         elif noise_sched_type == None:
             noise_sched = pipline.scheduler
             get_pipeline = DiffuserModelSched.__get_ldm_pipeline_generator(pipeline=DDPMPipeline)
@@ -666,17 +674,26 @@ class DiffuserModelSched():
         model: UNet2DModel = pipline.unet
         num_train_timesteps: int = 2000
         sigma_min: float = 0.01
-        sigma_max: float = 1348.0
+        sigma_max: float = 380.0
+        sampling_eps: float = 1e-05
+        correct_steps: int = 1
+        snr: float = 0.075
 
         if noise_sched_type == DiffuserModelSched.SCORE_SDE_VE_SCHED:
-            noise_sched = ScoreSdeVeScheduler(num_train_timesteps=num_train_timesteps, sigma_min=sigma_min, sigma_max=sigma_max)
-            get_pipeline = DiffuserModelSched.__get_ldm_pipeline_generator(pipeline=ScoreSdeVePipeline)
+            noise_sched = ScoreSdeVeScheduler(num_train_timesteps=num_train_timesteps, sigma_min=sigma_min, sigma_max=sigma_max, sampling_eps=sampling_eps, correct_steps=correct_steps, snr=snr)
+            get_pipeline = DiffuserModelSched.__get_pipeline_generator(unet=model, scheduler=noise_sched, pipeline=ScoreSdeVePipeline)
         elif noise_sched_type == DiffuserModelSched.EDM_VE_SCHED:
             noise_sched = KarrasVeScheduler(num_train_timesteps=num_train_timesteps, sigma_min=sigma_min, sigma_max=sigma_max)
-            get_pipeline = DiffuserModelSched.__get_ldm_pipeline_generator(pipeline=KarrasVePipeline)
+            get_pipeline = DiffuserModelSched.__get_pipeline_generator(unet=model, scheduler=noise_sched, pipeline=KarrasVePipeline)
+        elif noise_sched_type == DiffuserModelSched.EDM_VE_SDE_SCHED:
+            noise_sched = KarrasVeScheduler(num_train_timesteps=num_train_timesteps, sigma_min=sigma_min, sigma_max=sigma_max, s_churn=100)
+            get_pipeline = DiffuserModelSched.__get_pipeline_generator(unet=model, scheduler=noise_sched, pipeline=KarrasVePipeline)
+        elif noise_sched_type == DiffuserModelSched.EDM_VE_ODE_SCHED:
+            noise_sched = KarrasVeScheduler(num_train_timesteps=num_train_timesteps, sigma_min=sigma_min, sigma_max=sigma_max, s_churn=0)
+            get_pipeline = DiffuserModelSched.__get_pipeline_generator(unet=model, scheduler=noise_sched, pipeline=KarrasVePipeline)
         elif noise_sched_type == None:
             noise_sched = pipline.scheduler
-            get_pipeline = DiffuserModelSched.__get_ldm_pipeline_generator(pipeline=ScoreSdeVePipeline)
+            get_pipeline = DiffuserModelSched.__get_pipeline_generator(unet=model, scheduler=noise_sched, pipeline=ScoreSdeVePipeline)
         else:
             raise NotImplementedError()
         
@@ -744,6 +761,9 @@ class DiffuserModelSched():
         elif noise_sched_type == DiffuserModelSched.HEUN_SCHED:
             noise_sched = HeunDiscreteScheduler(num_train_timesteps=num_train_timesteps, beta_start=beta_start, beta_end=beta_end, beta_schedule=beta_schedule, trained_betas=trained_betas)
             get_pipeline = DiffuserModelSched.__get_ldm_pipeline_generator(pipeline=LDMPipeline_used)
+        elif noise_sched_type == DiffuserModelSched.LMSD_SCHED:
+            noise_sched = LMSDiscreteScheduler(num_train_timesteps=num_train_timesteps, beta_start=beta_start, beta_end=beta_end, beta_schedule=beta_schedule, trained_betas=trained_betas)
+            get_pipeline = DiffuserModelSched.__get_pipeline_generator(unet=model, scheduler=noise_sched, pipeline=LDMPipeline_used)
         elif noise_sched_type == None:
             noise_sched = pipline.scheduler
             get_pipeline = DiffuserModelSched.__get_ldm_pipeline_generator(pipeline=LDMPipeline)
@@ -756,9 +776,9 @@ class DiffuserModelSched():
         return model, vae, noise_sched, get_pipeline
     
     @staticmethod
-    def __get_model_sched(ckpt_id: str, clip_sample: bool, noise_sched_type: str=None, num_inference_steps: int=1000, sde_type: str=SDE_VP):
+    def __get_model_sched(ckpt_id: str, clip_sample: bool, clip_sample_range: float=None, noise_sched_type: str=None, num_inference_steps: int=1000, sde_type: str=SDE_VP):
         if sde_type == DiffuserModelSched.SDE_VP:
-            model, vae, noise_sched, get_pipeline = DiffuserModelSched.__get_model_sched_vp(ckpt_id=ckpt_id, clip_sample=clip_sample, noise_sched_type=noise_sched_type)
+            model, vae, noise_sched, get_pipeline = DiffuserModelSched.__get_model_sched_vp(ckpt_id=ckpt_id, clip_sample=clip_sample, clip_sample_range=clip_sample_range, noise_sched_type=noise_sched_type)
         elif sde_type == DiffuserModelSched.SDE_VE:
             model, vae, noise_sched, get_pipeline = DiffuserModelSched.__get_model_sched_ve(ckpt_id=ckpt_id, clip_sample=clip_sample, noise_sched_type=noise_sched_type)
         elif sde_type == DiffuserModelSched.SDE_LDM:
@@ -777,7 +797,7 @@ class DiffuserModelSched():
             raise ValueError(f"Arguement image_size and channels shouldn't be {image_size} and {channels}")
         
     @staticmethod
-    def get_model_sched(image_size: int=None, channels: int=None, ckpt: str=MODEL_DEFAULT, sde_type: str=SDE_VP, clip_sample: bool=None, noise_sched_type: str=None, **kwargs):
+    def get_model_sched(image_size: int=None, channels: int=None, ckpt: str=MODEL_DEFAULT, sde_type: str=SDE_VP, clip_sample: bool=None, clip_sample_range: float=None, noise_sched_type: str=None, **kwargs):
         @torch.no_grad()
         def weight_reset(m: nn.Module):
             # - check if the current module has reset_parameters & if it's callabed called it on m
@@ -792,7 +812,7 @@ class DiffuserModelSched():
         
         if ckpt == DiffuserModelSched.MODEL_DEFAULT or ckpt == DiffuserModelSched.DDPM_32_DEFAULT:
             DiffuserModelSched.check_image_size_channel(image_size=image_size, channels=channels)
-            _, noise_sched, get_pipeline = DiffuserModelSched.get_pretrained(ckpt=DiffuserModelSched.DDPM_CIFAR10_32, clip_sample=clip_sample, noise_sched_type=noise_sched_type, sde_type=sde_type)
+            _, vae, noise_sched, get_pipeline = DiffuserModelSched.get_pretrained(ckpt=DiffuserModelSched.DDPM_CIFAR10_32, clip_sample=clip_sample, clip_sample_range=clip_sample_range, noise_sched_type=noise_sched_type, sde_type=sde_type)
             model = UNet2DModel(
                 in_channels=channels,
                 out_channels=channels,
@@ -815,7 +835,7 @@ class DiffuserModelSched():
             model = model.apply(weight_reset)
         elif ckpt == DiffuserModelSched.NCSNPP_32_DEFAULT:
             DiffuserModelSched.check_image_size_channel(image_size=image_size, channels=channels)
-            _, noise_sched, get_pipeline = DiffuserModelSched.get_pretrained(ckpt=DiffuserModelSched.NCSNPP_CELEBA_HQ_256, clip_sample=clip_sample, noise_sched_type=noise_sched_type, sde_type=sde_type)
+            _, vae, noise_sched, get_pipeline = DiffuserModelSched.get_pretrained(ckpt=DiffuserModelSched.NCSNPP_CELEBA_HQ_256, clip_sample=clip_sample, clip_sample_range=clip_sample_range, noise_sched_type=noise_sched_type, sde_type=sde_type)
             model = UNet2DModel(
                 in_channels=channels,
                 out_channels=channels,
@@ -837,22 +857,22 @@ class DiffuserModelSched():
             )
             model = model.apply(weight_reset)
         elif ckpt == DiffuserModelSched.DDPM_CIFAR10_DEFAULT:
-            model, noise_sched, get_pipeline = DiffuserModelSched.get_pretrained(ckpt=DiffuserModelSched.DDPM_CIFAR10_32, clip_sample=clip_sample, noise_sched_type=noise_sched_type, sde_type=sde_type)
+            model, vae, noise_sched, get_pipeline = DiffuserModelSched.get_pretrained(ckpt=DiffuserModelSched.DDPM_CIFAR10_32, clip_sample=clip_sample, clip_sample_range=clip_sample_range, noise_sched_type=noise_sched_type, sde_type=sde_type)
             model = model.apply(weight_reset)
         elif ckpt == DiffuserModelSched.DDPM_CELEBA_HQ_DEFAULT:
-            model, noise_sched, get_pipeline = DiffuserModelSched.get_pretrained(ckpt=DiffuserModelSched.DDPM_CELEBA_HQ_256, clip_sample=clip_sample, noise_sched_type=noise_sched_type, sde_type=sde_type)
+            model, vae, noise_sched, get_pipeline = DiffuserModelSched.get_pretrained(ckpt=DiffuserModelSched.DDPM_CELEBA_HQ_256, clip_sample=clip_sample, clip_sample_range=clip_sample_range, noise_sched_type=noise_sched_type, sde_type=sde_type)
             model = model.apply(weight_reset)
         elif ckpt == DiffuserModelSched.DDPM_CHURCH_DEFAULT:
-            model, noise_sched, get_pipeline = DiffuserModelSched.get_pretrained(ckpt=DiffuserModelSched.DDPM_CHURCH_256, clip_sample=clip_sample, noise_sched_type=noise_sched_type, sde_type=sde_type)
+            model, vae, noise_sched, get_pipeline = DiffuserModelSched.get_pretrained(ckpt=DiffuserModelSched.DDPM_CHURCH_256, clip_sample=clip_sample, clip_sample_range=clip_sample_range, noise_sched_type=noise_sched_type, sde_type=sde_type)
             model = model.apply(weight_reset)
         elif ckpt == DiffuserModelSched.DDPM_BEDROOM_DEFAULT:
-            model, noise_sched, get_pipeline = DiffuserModelSched.get_pretrained(ckpt=DiffuserModelSched.DDPM_BEDROOM_256, clip_sample=clip_sample, noise_sched_type=noise_sched_type, sde_type=sde_type)
+            model, vae, noise_sched, get_pipeline = DiffuserModelSched.get_pretrained(ckpt=DiffuserModelSched.DDPM_BEDROOM_256, clip_sample=clip_sample, clip_sample_range=clip_sample_range, noise_sched_type=noise_sched_type, sde_type=sde_type)
             model = model.apply(weight_reset)
         elif ckpt == DiffuserModelSched.LDM_CELEBA_HQ_DEFAULT:
-            model, noise_sched, get_pipeline = DiffuserModelSched.get_pretrained(ckpt=DiffuserModelSched.LDM_CELEBA_HQ_256, clip_sample=clip_sample, noise_sched_type=noise_sched_type, sde_type=sde_type)
+            model, vae, noise_sched, get_pipeline = DiffuserModelSched.get_pretrained(ckpt=DiffuserModelSched.LDM_CELEBA_HQ_256, clip_sample=clip_sample, clip_sample_range=clip_sample_range, noise_sched_type=noise_sched_type, sde_type=sde_type)
             model = model.apply(weight_reset)
         elif ckpt == DiffuserModelSched.NCSNPP_CIFAR10_DEFAULT:
-            _, noise_sched, get_pipeline = DiffuserModelSched.get_pretrained(ckpt=DiffuserModelSched.NCSNPP_CELEBA_HQ_256, clip_sample=clip_sample, noise_sched_type=noise_sched_type, sde_type=sde_type)
+            _, vae, noise_sched, get_pipeline = DiffuserModelSched.get_pretrained(ckpt=DiffuserModelSched.NCSNPP_CELEBA_HQ_256, clip_sample=clip_sample, clip_sample_range=clip_sample_range, noise_sched_type=noise_sched_type, sde_type=sde_type)
             model = UNet2DModel(
                 in_channels=3,
                 out_channels=3,
@@ -874,17 +894,17 @@ class DiffuserModelSched():
             )
             model = model.apply(weight_reset)
         elif ckpt == DiffuserModelSched.NCSNPP_CELEBA_HQ_DEFAULT:
-            model, noise_sched, get_pipeline = DiffuserModelSched.get_pretrained(ckpt=DiffuserModelSched.NCSNPP_CELEBA_HQ_256, clip_sample=clip_sample, noise_sched_type=noise_sched_type, sde_type=sde_type)
+            model, vae, noise_sched, get_pipeline = DiffuserModelSched.get_pretrained(ckpt=DiffuserModelSched.NCSNPP_CELEBA_HQ_256, clip_sample=clip_sample, clip_sample_range=clip_sample_range, noise_sched_type=noise_sched_type, sde_type=sde_type)
             model = model.apply(weight_reset)
         elif ckpt == DiffuserModelSched.NCSNPP_CHURCH_DEFAULT:
-            model, noise_sched, get_pipeline = DiffuserModelSched.get_pretrained(ckpt=DiffuserModelSched.NCSNPP_CHURCH_256, clip_sample=clip_sample, noise_sched_type=noise_sched_type, sde_type=sde_type)
+            model, vae, noise_sched, get_pipeline = DiffuserModelSched.get_pretrained(ckpt=DiffuserModelSched.NCSNPP_CHURCH_256, clip_sample=clip_sample, clip_sample_range=clip_sample_range, noise_sched_type=noise_sched_type, sde_type=sde_type)
             model = model.apply(weight_reset)
         else:
-            model, vae, noise_sched, get_pipeline = DiffuserModelSched.get_pretrained(ckpt=ckpt, clip_sample=clip_sample, noise_sched_type=noise_sched_type, sde_type=sde_type)
+            model, vae, noise_sched, get_pipeline = DiffuserModelSched.get_pretrained(ckpt=ckpt, clip_sample=clip_sample, clip_sample_range=clip_sample_range, noise_sched_type=noise_sched_type, sde_type=sde_type)
         return model, vae, noise_sched, get_pipeline
     
     @staticmethod
-    def get_pretrained(ckpt: str, clip_sample: bool=None, noise_sched_type: str=None, num_inference_steps: int=1000, sde_type: str=SDE_VP):
+    def get_pretrained(ckpt: str, clip_sample: bool=None, clip_sample_range: float=None, noise_sched_type: str=None, num_inference_steps: int=1000, sde_type: str=SDE_VP):
         if ckpt == DiffuserModelSched.DDPM_CIFAR10_32:
             ckpt: str = "google/ddpm-cifar10-32"
         elif ckpt == DiffuserModelSched.DDPM_CELEBA_HQ_256:
@@ -903,7 +923,7 @@ class DiffuserModelSched():
             ckpt: str = "google/ncsnpp-church-256"
             
         # return model, noise_sched
-        return DiffuserModelSched.__get_model_sched(ckpt_id=ckpt, clip_sample=clip_sample, noise_sched_type=noise_sched_type, sde_type=sde_type)
+        return DiffuserModelSched.__get_model_sched(ckpt_id=ckpt, clip_sample=clip_sample, clip_sample_range=clip_sample_range, noise_sched_type=noise_sched_type, sde_type=sde_type)
         
     @staticmethod
     def get_optim(ckpt: str, optim: torch.optim, lr_sched: torch.optim.lr_scheduler):

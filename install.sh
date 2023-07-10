@@ -5,17 +5,17 @@ curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.s
 sudo apt-get install git-lfs
 git lfs install
 
-# pip install pyarrow==6.0.1
-# pip install accelerate comet-ml matplotlib datasets tqdm tensorboard tensorboardX torchvision tensorflow-datasets einops pytorch-fid joblib PyYAML kaggle wandb torchsummary torchinfo lpips torchmetrics
-# pip install git+https://github.com/Database-Project-2021/scalablerunner.git
+pip install pyarrow==6.0.1
+pip install accelerate comet-ml matplotlib datasets tqdm tensorboard tensorboardX torchvision tensorflow-datasets einops pytorch-fid joblib PyYAML kaggle wandb torchsummary torchinfo lpips torchmetrics
+pip install git+https://github.com/Database-Project-2021/scalablerunner.git
 
-# cd diffusers
-# pip install .
-# cd ..
+cd diffusers
+pip install .
+cd ..
 
-echo 'export HF_DATASETS_CACHE="/work/u2941379"' >> ~/.bashrc
+# echo 'export HF_DATASETS_CACHE="{Your HF Cache Path}"' >> ~/.bashrc
 
-wandb login --relogin --cloud 0c8187873929b53a9da16b3619d2b7d0c5307da1
+# wandb login --relogin --cloud {Your Key}
 
 sudo su - root -c "curl -fsSL https://code-server.dev/install.sh | sh"
 
