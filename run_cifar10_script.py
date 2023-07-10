@@ -42,15 +42,15 @@ if __name__ == "__main__":
                 }
             }, 
         },
-        'Measure CIFAR10, LMSD: 50':{
+        'Measure CIFAR10, DPM-SOLVER O2, UNIPC: 20':{
             'GPU - 0': {
                 'Call': "python VillanDiffusion.py",
                 'Param': {
                     '--project': [project],
                     '--mode': ['measure'],
                     '--eval_max_batch': [1500],
-                    '--sched': [DiffuserModelSched.LMSD_SCHED],
-                    '--infer_steps': [50],
+                    '--sched': [DiffuserModelSched.DPM_SOLVER_O2_SCHED, DiffuserModelSched.UNIPC_SCHED],
+                    '--infer_steps': [20],
                     '--fclip': ['o', 'w'],
                     '--ckpt': exp_ls, 
                 },

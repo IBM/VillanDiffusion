@@ -25,8 +25,15 @@ wandb login --relogin --cloud <API Key>
 
 ### Prepare Dataset
 
+#### Training
+
 - CIFAR10: It will be downloaded by HuggingFace ``datasets`` automatically
 - CelebA-HQ: Download the CelebA-HQ dataset and put the images under the folder ``./datasets/celeba_hq_256``
+
+#### Evaluation
+
+- CIFAR10: Create a folder ``./measure/CIFAR10`` and put the images of CIFAR10 under the folder.
+- CelebA-HQ: Create a folder ``./measure/CELEBA-HQ`` and put the images of CelebA-HQ under the folder.
 
 ### Backdoor Unconditional Diffusion Models with VillanDiffusion
 
