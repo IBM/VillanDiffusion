@@ -56,7 +56,7 @@ Arguments
 - ``--epoch``: Training epoch num, default: 50
 - ``--learning_rate``: Learning rate, default for 32 * 32 image: '2e-4', default for larger images: '8e-5'
 - ``--poison_rate``: Poison rate
-- ``--trigger``: Trigger pattern, default: ``BOX_14``, choice: ``BOX_14``, ``STOP_SIGN_14``, and ``GLASSES``.
+- ``--trigger``: Trigger pattern, default: ``BOX_14``, choice: ``BOX_14``, ``STOP_SIGN_14``, ``BOX_18``, ``STOP_SIGN_18``, ``BOX_11``, ``STOP_SIGN_11``, ``BOX_8``, ``STOP_SIGN_8``, ``BOX_4``, ``STOP_SIGN_4``, and ``GLASSES``.
 - ``--target``: Target pattern, default: 'CORNER', choice: ``NOSHIFT``, ``SHIFT``, ``CORNER``, ``SHOE``, ``HAT``, ``CAT``
 - ``--gpu``: Specify GPU device
 - ``--ckpt``: Load the HuggingFace Diffusers pre-trained models or the saved checkpoint, default: ``DDPM-CIFAR10-32``, choice: ``DDPM-CIFAR10-32``, ``DDPM-CELEBA-HQ-256``, ``LDM-CELEBA-HQ-256``, or user specify checkpoint path
