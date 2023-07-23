@@ -681,19 +681,19 @@ class DiffuserModelSched():
 
         if noise_sched_type == DiffuserModelSched.SCORE_SDE_VE_SCHED:
             noise_sched = ScoreSdeVeScheduler(num_train_timesteps=num_train_timesteps, sigma_min=sigma_min, sigma_max=sigma_max, sampling_eps=sampling_eps, correct_steps=correct_steps, snr=snr)
-            get_pipeline = DiffuserModelSched.__get_pipeline_generator(unet=model, scheduler=noise_sched, pipeline=ScoreSdeVePipeline)
+            get_pipeline = DiffuserModelSched.__get_ldm_pipeline_generator(pipeline=ScoreSdeVePipeline)
         elif noise_sched_type == DiffuserModelSched.EDM_VE_SCHED:
             noise_sched = KarrasVeScheduler(num_train_timesteps=num_train_timesteps, sigma_min=sigma_min, sigma_max=sigma_max)
-            get_pipeline = DiffuserModelSched.__get_pipeline_generator(unet=model, scheduler=noise_sched, pipeline=KarrasVePipeline)
+            get_pipeline = DiffuserModelSched.__get_ldm_pipeline_generator(pipeline=KarrasVePipeline)
         elif noise_sched_type == DiffuserModelSched.EDM_VE_SDE_SCHED:
             noise_sched = KarrasVeScheduler(num_train_timesteps=num_train_timesteps, sigma_min=sigma_min, sigma_max=sigma_max, s_churn=100)
-            get_pipeline = DiffuserModelSched.__get_pipeline_generator(unet=model, scheduler=noise_sched, pipeline=KarrasVePipeline)
+            get_pipeline = DiffuserModelSched.__get_ldm_pipeline_generator(pipeline=KarrasVePipeline)
         elif noise_sched_type == DiffuserModelSched.EDM_VE_ODE_SCHED:
             noise_sched = KarrasVeScheduler(num_train_timesteps=num_train_timesteps, sigma_min=sigma_min, sigma_max=sigma_max, s_churn=0)
-            get_pipeline = DiffuserModelSched.__get_pipeline_generator(unet=model, scheduler=noise_sched, pipeline=KarrasVePipeline)
+            get_pipeline = DiffuserModelSched.__get_ldm_pipeline_generator(pipeline=KarrasVePipeline)
         elif noise_sched_type == None:
             noise_sched = pipline.scheduler
-            get_pipeline = DiffuserModelSched.__get_pipeline_generator(unet=model, scheduler=noise_sched, pipeline=ScoreSdeVePipeline)
+            get_pipeline = DiffuserModelSched.__get_ldm_pipeline_generator(pipeline=ScoreSdeVePipeline)
         else:
             raise NotImplementedError()
         
