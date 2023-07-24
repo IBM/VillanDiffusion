@@ -117,3 +117,17 @@ For example, if we want to generate samples from the model under the folder: res
 ```bash
 python sampling.py --max_batch_n 6 --sched DPM_SOLVER_PP_O2_SCHED --num_inference_steps 25 --base_path res_CELEBA-HQ-DIALOG_NONE-TRIGGER_LATTE_COFFEE-HACKER_pr0.0_ca0_caw1.0_rctp0_lr0.0001_step50000_prior1.0_lora4 --ckpt_step -1 --gpu 0
 ```
+
+<!-- ### Clean Loss: 
+
+$$
+|| \epsilon_{t} + \sigma_{t} \cdot \epsilon_{\theta}(x_{0} + \sigma_t \epsilon_{t}) ||_2
+$$
+
+### Backdoor Loss: 
+
+$$
+|| (\epsilon_{t} + \mathcal{R}_{t} \mathbf{r}) + \sigma_{t} \cdot \epsilon_{\theta}(\mathbf{y} + \sigma_t \epsilon_{t} + \mathcal{S}_{t} \mathbf{r}) ||_2
+$$
+
+$\mathcal{R}_{t}$ is R_coef, $\mathbf{y}$ is target image , and $\mathcal{S}_{t}$ is step -->

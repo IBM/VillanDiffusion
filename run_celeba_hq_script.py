@@ -28,7 +28,7 @@ if __name__ == "__main__":
                     '--eval_max_batch': [64],
                     '--epoch': [epochs],
                     '--clean_rate': [1],
-                    '--poison_rate': [0.7],
+                    '--poison_rate': [0.9],
                     '--trigger': [Backdoor.TRIGGER_GLASSES],
                     '--target': [Backdoor.TARGET_CAT],
                     '--solver_type': ['ode'],
