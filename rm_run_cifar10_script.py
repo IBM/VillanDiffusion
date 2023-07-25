@@ -6,7 +6,7 @@ from model import DiffuserModelSched
 
 if __name__ == "__main__":
     project: str = "default"
-    result_dir: str = "exp_GenBadDiffusion_Poison_Rates_DDPM_BadDiff_ODE_RM"
+    result_dir: str = "exp_GenBadDiffusion_Poison_Rates_DDPM_BadDiff_ODE_NEW"
     exp_ls = list(set(glob.glob(f"{result_dir}/res_*")))
     config = {
         'Poison Rate':{

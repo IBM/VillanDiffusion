@@ -5,10 +5,13 @@ curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.s
 sudo apt-get install git-lfs
 git lfs install
 
-pip install pyarrow==6.0.1
-pip install accelerate comet-ml matplotlib datasets tqdm tensorboard tensorboardX torchvision tensorflow-datasets einops pytorch-fid joblib PyYAML kaggle wandb torchsummary torchinfo lpips torchmetrics
-pip install git+https://github.com/Database-Project-2021/scalablerunner.git
+# pip install pyarrow==6.0.1
+# pip install accelerate comet-ml matplotlib datasets tqdm tensorboard tensorboardX torchvision tensorflow-datasets einops pytorch-fid joblib PyYAML kaggle wandb torchsummary torchinfo lpips torchmetrics
+# pip install git+https://github.com/Database-Project-2021/scalablerunner.git
 
+git clone git@github.com:FrankCCCCC/diffusers.git
+git fetch -a
+git checkout -b my remotes/origin/my
 cd diffusers
 pip install .
 cd ..

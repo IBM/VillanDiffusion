@@ -20,7 +20,7 @@ from typing import Callable, List, Tuple, Union
 from functools import lru_cache
 import warnings
 
-from datasets import load_dataset, concatenate_datasets, load_from_disk
+from datasets import load_dataset, concatenate_datasets
 import datasets
 from datasets.dataset_dict import DatasetDict
 from matplotlib import pyplot as plt
@@ -44,6 +44,7 @@ class DatasetLoader(object):
     MODE_FIXED = "FIXED"
     MODE_FLEX = "FLEX"
     MODE_NONE = "NONE"
+    MODE_EXTEND = "EXTEND"
     
     # Dataset names
     MNIST = "MNIST"
@@ -62,8 +63,11 @@ class DatasetLoader(object):
     TRAIN = "train"
     TEST = "test"
     PIXEL_VALUES = "pixel_values"
+    PIXEL_VALUES_TRIGGER = "pixel_values_trigger"
+    TRIGGER = "trigger"
     TARGET = "target"
     IS_CLEAN = "is_clean"
+    R_trigger_only = "R_trigger_only"
     IMAGE = "image"
     LABEL = "label"
     def __init__(self, name: str, label: int=None, root: str=None, channel: int=None, image_size: int=None, vmin: Union[int, float]=DEFAULT_VMIN, vmax: Union[int, float]=DEFAULT_VMAX, batch_size: int=512, shuffle: bool=True, seed: int=0):
@@ -81,18 +85,22 @@ class DatasetLoader(object):
         self.__dataset = self.__load_dataset(name=name)
         self.__set_img_shape(image_size=image_size)
         self.__trigger_type = self.__target_type = None
-        self.__trigger = self.__target = self.__poison_rate = None
+        self.__trigger = self.__target = self.__poison_rate = self.__ext_poison_rate = None
         self.__clean_rate = 1
         self.__seed = seed
+        self.__rand_generator = torch.Generator()
+        self.__rand_generator.manual_seed(self.__seed)
         if root != None:
             self.__backdoor = Backdoor(root=root)
+        self.__R_trigger_only: bool = False
         
         # self.__prep_dataset()
 
-    def set_poison(self, trigger_type: str, target_type: str, target_dx: int=-5, target_dy: int=-3, clean_rate: float=1.0, poison_rate: float=0.2) -> 'DatasetLoader':
+    def set_poison(self, trigger_type: str, target_type: str, target_dx: int=-5, target_dy: int=-3, clean_rate: float=1.0, poison_rate: float=0.2, ext_poison_rate: float=0.0) -> 'DatasetLoader':
         if self.__root == None:
             raise ValueError("Attribute 'root' is None")
         self.__clean_rate = clean_rate
+        self.__ext_poison_rate = ext_poison_rate
         self.__poison_rate = poison_rate
         self.__trigger_type = trigger_type
         self.__target_type = target_type
@@ -242,8 +250,8 @@ class DatasetLoader(object):
         def trans(x):
             if x[DatasetLoader.IS_CLEAN][0]:
                 # print(f"IS_CLEAN: {x[DatasetLoader.IS_CLEAN]}")
-                return self.__transform_generator(self.__name, True)(x)
-            return self.__transform_generator(self.__name, False)(x)
+                return self.__transform_generator(self.__name, True, self.__R_trigger_only)(x)
+            return self.__transform_generator(self.__name, False, self.__R_trigger_only)(x)
         
         
         self.__full_dataset = concatenate_datasets(ds_ls)
@@ -281,24 +289,137 @@ class DatasetLoader(object):
         gen = torch.Generator()
         gen.manual_seed(self.__seed)
         
+        def portion_sz(rate: float, n: int):
+            return int(n * float(rate))
+        
+        def slice_ds(dataset, rate: float, ds_size: int):
+            if float(rate) == 0.0:
+                return None
+            elif float(rate) == 1.0:
+                return dataset
+            else:
+                return dataset.train_test_split(test_size=portion_sz(rate=rate, n=ds_size))[DatasetLoader.TEST]
+        
+        ds_ls: List = []
         ds_n = len(self.__dataset)
-        train_n = int(ds_n * float(self.__clean_rate))
-        test_n = int(ds_n * float(self.__poison_rate))
+        print(f"Total Dataset Size: {ds_n}")
         
         # Apply transformations
-        self.__full_dataset: datasets.DatasetDict = self.__dataset.train_test_split(train_size=train_n, test_size=test_n)
-        self.__full_dataset[DatasetLoader.TRAIN] = self.__full_dataset[DatasetLoader.TRAIN].add_column(DatasetLoader.IS_CLEAN, [True] * train_n)
-        self.__full_dataset[DatasetLoader.TEST] = self.__full_dataset[DatasetLoader.TEST].add_column(DatasetLoader.IS_CLEAN, [False] * test_n)
+        self.__full_dataset: datasets.DatasetDict = self.__dataset.train_test_split()
+        
+        clean_ds = slice_ds(dataset=self.__dataset, rate=float(self.__clean_rate), ds_size=ds_n)
+        if clean_ds is not None:
+            print(f"[Mode Flex] Clean Dataset Size: {len(clean_ds)}")
+            ds_ls.append(clean_ds.add_column(DatasetLoader.IS_CLEAN, [True] * portion_sz(rate=self.__clean_rate, n=ds_n)))
+        else:
+            print(f"[Mode Flex] Clean Dataset Size: 0")
+        
+        backdoor_ds = slice_ds(dataset=self.__dataset, rate=float(self.__poison_rate), ds_size=ds_n)
+        if backdoor_ds is not None:
+            print(f"[Mode Flex] Backdoor Dataset Size: {len(backdoor_ds)}")
+            ds_ls.append(backdoor_ds.add_column(DatasetLoader.IS_CLEAN, [False] * portion_sz(rate=self.__poison_rate, n=ds_n)))
+        else:
+            print(f"[Mode Flex] Backdoor Dataset Size: 0")
+        
+        # self.__full_dataset[DatasetLoader.TRAIN] = self.__full_dataset[DatasetLoader.TRAIN].add_column(DatasetLoader.IS_CLEAN, [True] * train_n)
+        # self.__full_dataset[DatasetLoader.TEST] = self.__full_dataset[DatasetLoader.TEST].add_column(DatasetLoader.IS_CLEAN, [False] * test_n)
         
         def trans(x):
             if x[DatasetLoader.IS_CLEAN][0]:
-                return self.__transform_generator(self.__name, True)(x)
-            return self.__transform_generator(self.__name, False)(x)
+                return self.__transform_generator(self.__name, True, self.__R_trigger_only)(x)
+            return self.__transform_generator(self.__name, False, self.__R_trigger_only)(x)
         
-        self.__full_dataset = concatenate_datasets([self.__full_dataset[DatasetLoader.TRAIN], self.__full_dataset[DatasetLoader.TEST]])
+        self.__full_dataset = concatenate_datasets(ds_ls)
         self.__full_dataset = self.__full_dataset.with_transform(trans)
+        print(f"[Mode Flex] Full Dataset Size: {len(self.__full_dataset)}")
+
+    def __extend_sz_dataset(self):
+        gen = torch.Generator()
+        gen.manual_seed(self.__seed)
+        
+        def portion_sz(rate: float, n: int):
+            return int(n * float(rate))
+        
+        def slice_ds(dataset, rate: float, ds_size: int):
+            if float(rate) == 0.0:
+                return None
+            elif float(rate) == 1.0:
+                return dataset
+            elif float(rate) > 1.0:
+                mul: int = int(rate // 1)
+                mod: float = float(rate - mul)
+                cat_ds = [slice_ds(dataset, rate=1.0, ds_size=ds_size) for i in range(mul)]
+                if mod > 0:
+                    cat_ds.append(slice_ds(dataset, rate=mod, ds_size=ds_size))
+                return concatenate_datasets(cat_ds)
+            else:
+                return dataset.train_test_split(test_size=portion_sz(rate=rate, n=ds_size))[DatasetLoader.TEST]
+
+        def trans(x):
+            # print(f"x[DatasetLoader.IS_CLEAN] len: {len(x[DatasetLoader.IS_CLEAN])}")
+            if x[DatasetLoader.IS_CLEAN][0]:
+                return self.__transform_generator(self.__name, True, x[DatasetLoader.R_trigger_only][0])(x)
+            return self.__transform_generator(self.__name, False, x[DatasetLoader.R_trigger_only][0])(x)
+        
+        ds_ls: List = []
+        ds_n = len(self.__dataset)
+        ext_backdoor_n = int(ds_n * float(self.__ext_poison_rate))
+        print(f"Total Dataset Size: {ds_n}")
+        clean_dataset = ext_backdoor_dataset = backdoor_dataset = None
+        
+        # Apply transformations
+        if float(self.__ext_poison_rate) == 0.0:
+            clean_dataset = self.__dataset
+            ext_backdoor_dataset = None
+        elif float(self.__ext_poison_rate) == 1.0:
+            clean_dataset = None
+            ext_backdoor_dataset = self.__dataset
+        else:
+            full_dataset: datasets.DatasetDict = self.__dataset.train_test_split(test_size=ext_backdoor_n)
+            clean_dataset = full_dataset[DatasetLoader.TRAIN]
+            ext_backdoor_dataset = full_dataset[DatasetLoader.TEST]
+        
+        if clean_dataset != None:
+            clean_n = len(clean_dataset)
+            clean_dataset = clean_dataset.add_column(DatasetLoader.IS_CLEAN, [True] * clean_n).add_column(DatasetLoader.R_trigger_only, [False] * clean_n)
+            print(f"[Mode Extend] Clean Dataset Size: {len(clean_dataset)}, {clean_dataset[1].keys()}")
+            clean_dataset = clean_dataset.with_transform(trans)
+            ds_ls.append(clean_dataset)
+        else:
+            print(f"[Mode Extend] Clean Dataset Size: 0")
+        # print(f"TRAIN IS_CLEAN N: {len(self.__full_dataset[DatasetLoader.TRAIN].filter(lambda x: x[DatasetLoader.IS_CLEAN]))}")
+        
+        if ext_backdoor_dataset != None:
+            ext_backdoor_n = len(ext_backdoor_dataset)
+            ext_backdoor_dataset = ext_backdoor_dataset.add_column(DatasetLoader.IS_CLEAN, [False] * ext_backdoor_n).add_column(DatasetLoader.R_trigger_only, [self.__ext_R_trigger_only] * ext_backdoor_n)
+            print(f"[Mode Extend] Extend Backdoor Dataset Size: {len(ext_backdoor_dataset)},  {ext_backdoor_dataset[1].keys()}")
+            ext_backdoor_dataset = ext_backdoor_dataset.with_transform(trans)
+            ds_ls.append(ext_backdoor_dataset)
+        else:
+            print(f"[Mode Extend] Extend Backdoor Dataset Size: 0")
+        # print(f"TEST !IS_CLEAN N: {len(self.__full_dataset[DatasetLoader.TEST].filter(lambda x: not x[DatasetLoader.IS_CLEAN]))}")
+        
+        backdoor_dataset = slice_ds(dataset=self.__dataset, rate=float(self.__poison_rate), ds_size=ds_n)
+        if backdoor_dataset is not None:
+            backdoor_n = portion_sz(rate=self.__poison_rate, n=ds_n)
+            backdoor_dataset = backdoor_dataset.add_column(DatasetLoader.IS_CLEAN, [False] * backdoor_n).add_column(DatasetLoader.R_trigger_only, [self.__R_trigger_only] * backdoor_n)
+            print(f"[Mode Extend] Backdoor Dataset Size: {len(backdoor_dataset)}, {backdoor_dataset[1].keys()}")
+            backdoor_dataset = backdoor_dataset.with_transform(trans)
+            ds_ls.append(backdoor_dataset)
+        else:
+            print(f"[Mode Extend] Backdoor Dataset Size: 0")
+        
+        # self.__full_dataset[DatasetLoader.TRAIN] = self.__full_dataset[DatasetLoader.TRAIN].add_column(DatasetLoader.IS_CLEAN, [True] * train_n)
+        # self.__full_dataset[DatasetLoader.TEST] = self.__full_dataset[DatasetLoader.TEST].add_column(DatasetLoader.IS_CLEAN, [False] * test_n)
+
+        self.__full_dataset = concatenate_datasets(ds_ls)
+        # self.__full_dataset = self.__full_dataset.with_transform(trans)
+        print(f"[Mode Extend] Full Dataset Size: {len(self.__full_dataset)}")
     
-    def prepare_dataset(self, mode: str="FIXED") -> 'DatasetLoader':
+    def prepare_dataset(self, mode: str="FIXED", R_trigger_only: bool=False, ext_R_trigger_only: bool=False, R_gaussian_aug: float=0.0) -> 'DatasetLoader':
+        self.__R_trigger_only = R_trigger_only
+        self.__ext_R_trigger_only = ext_R_trigger_only
+        self.__R_gaussian_aug = R_gaussian_aug
         # Filter specified classes
         if self.__label != None:
             self.__dataset = self.__dataset.filter(lambda x: x[DatasetLoader.LABEL] in self.__label)
@@ -309,6 +430,8 @@ class DatasetLoader(object):
             self.__fixed_sz_dataset()
         elif mode == DatasetLoader.MODE_FLEX:
             self.__flex_sz_dataset()
+        elif mode == DatasetLoader.MODE_EXTEND:
+            self.__extend_sz_dataset()
         elif mode == DatasetLoader.MODE_NONE:
             self.__full_dataset = self.__dataset
         else:
@@ -319,6 +442,7 @@ class DatasetLoader(object):
             self.__full_dataset.set_poison(target_key=self.__target_type, poison_key=self.__trigger_type, raw='raw', poison_rate=self.__poison_rate, use_latent=True).set_use_names(target=DatasetLoader.TARGET, poison=DatasetLoader.PIXEL_VALUES, raw=DatasetLoader.IMAGE)
         
         # Note the minimum and the maximum values
+        print(f"{self.__full_dataset[1].keys()}")
         ex = self.__full_dataset[1][DatasetLoader.TARGET]
         print(f"Dataset Len: {len(self.__full_dataset)}")
         if len(ex) == 1:
@@ -348,7 +472,7 @@ class DatasetLoader(object):
     def get_mask(self, trigger: torch.Tensor) -> torch.Tensor:
         return torch.where(trigger > self.__vmin, 0, 1)
 
-    def __transform_generator(self, dataset_name: str, clean: bool) -> Callable[[torch.Tensor], torch.Tensor]:
+    def __transform_generator(self, dataset_name: str, clean: bool, R_trigger_only: bool) -> Callable[[torch.Tensor], torch.Tensor]:
         if dataset_name == self.MNIST:
             img_key = "image"
         elif dataset_name == self.CIFAR10:
@@ -370,9 +494,15 @@ class DatasetLoader(object):
                 # examples[DatasetLoader.PIXEL_VALUES] = torch.tensor(np.array([np.asarray(image) / 255 for image in examples[img_key]])).permute(0, 3, 1, 2)
                 if img_key != DatasetLoader.IMAGE:
                     del examples[img_key]
-                
+            
+            examples[DatasetLoader.PIXEL_VALUES_TRIGGER] = torch.full_like(examples[DatasetLoader.IMAGE], 0)
             examples[DatasetLoader.PIXEL_VALUES] = torch.full_like(examples[DatasetLoader.IMAGE], 0)
             examples[DatasetLoader.TARGET] = torch.clone(examples[DatasetLoader.IMAGE])
+            
+            data_shape = examples[DatasetLoader.PIXEL_VALUES].shape
+            repeat_times = (data_shape[0], *([1] * len(data_shape[1:])))
+            examples[DatasetLoader.TRIGGER] = self.__trigger.repeat(*repeat_times)
+            
             # examples[DatasetLoader.IS_CLEAN] = torch.tensor([True] * len(examples[DatasetLoader.PIXEL_VALUES]))
             if DatasetLoader.LABEL in examples:
                 examples[DatasetLoader.LABEL] = torch.tensor([torch.tensor(x, dtype=torch.float) for x in examples[DatasetLoader.LABEL]])
@@ -390,7 +520,14 @@ class DatasetLoader(object):
             
             masks = self.get_mask(self.__trigger).repeat(*repeat_times)
             # print(f"masks shape: {masks.shape} | examples[DatasetLoader.PIXEL_VALUES] shape: {examples[DatasetLoader.PIXEL_VALUES].shape} | self.__trigger.repeat(*repeat_times) shape: {self.__trigger.repeat(*repeat_times).shape}")
-            examples[DatasetLoader.PIXEL_VALUES] = masks * examples[DatasetLoader.IMAGE] + (1 - masks) * self.__trigger.repeat(*repeat_times)
+            # examples[DatasetLoader.PIXEL_VALUES] = masks * examples[DatasetLoader.IMAGE] + (1 - masks) * self.__trigger.repeat(*repeat_times)
+
+            examples[DatasetLoader.PIXEL_VALUES_TRIGGER] = self.__trigger.repeat(*repeat_times)
+            if R_trigger_only:
+                examples[DatasetLoader.PIXEL_VALUES] = self.__trigger.repeat(*repeat_times)
+            else:
+                examples[DatasetLoader.PIXEL_VALUES] = masks * examples[DatasetLoader.IMAGE] + (1 - masks) * self.__trigger.repeat(*repeat_times)
+                
             # print(f"self.__target.repeat(*repeat_times) shape: {self.__target.repeat(*repeat_times).shape}")
             examples[DatasetLoader.TARGET] = self.__target.repeat(*repeat_times)
             # examples[DatasetLoader.IS_CLEAN] = torch.tensor([False] * data_shape[0])
@@ -466,7 +603,7 @@ class DatasetLoader(object):
     
     def __len__(self):
         return self.len
-    
+        
     @property
     def num_batch(self):
         return len(self.get_dataloader())
