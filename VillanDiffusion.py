@@ -349,7 +349,7 @@ def get_accelerator(config: TrainingConfig):
         gradient_accumulation_steps=config.gradient_accumulation_steps, 
         log_with=["tensorboard", "wandb"],
         # log_with="tensorboard",
-        logging_dir=os.path.join(config.output_dir, "logs")
+        project_dir=os.path.join(config.output_dir, "logs")
     )
     return accelerator
 
