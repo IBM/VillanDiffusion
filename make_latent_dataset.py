@@ -22,7 +22,7 @@ class TrainingConfig:
     dataset_name: str = DatasetLoader.CELEBA_HQ
     trigger: str = Backdoor.TRIGGER_SM_STOP_SIGN
     target: str = Backdoor.TARGET_FA
-    poison_rate: float = 0.5
+    poison_rate: float = 0.0
     batch_size: int = 32
     ckpt: str = DiffuserModelSched.LDM_CELEBA_HQ_256
     clip: bool = False
@@ -410,8 +410,8 @@ def generate_latents_dataset(config: TrainingConfig, lds: LatentDataset, dsl: Da
         # lds.update_data_by_idxs(data_type='raw', idxs=idxs, vals=batch[DatasetLoader.IMAGE])
         pbar.update(1)
     pbar.close()
-
-if __name__ == '__main__':
+    
+def main(config: TrainingConfig):
     config: TrainingConfig = TrainingConfig()
     ds_root = os.path.join('datasets')
     idx: int = -29000
@@ -435,3 +435,25 @@ if __name__ == '__main__':
     print(f"lds[{idx}][DatasetLoader.TARGET]: {lds[idx][DatasetLoader.TARGET].shape}")
     print(f"lds[{idx}][DatasetLoader.PIXEL_VALUES]: {lds[idx][DatasetLoader.PIXEL_VALUES].shape}")
     print(f"lds[{idx}][DatasetLoader.IMAGE]: {lds[idx][DatasetLoader.IMAGE].shape}")
+
+if __name__ == '__main__':
+    config: TrainingConfig = TrainingConfig()
+    
+    config.poison_rate = 0.0
+    config.trigger = Backdoor.TRIGGER_NONE
+    main(config=config)
+    # Trigger: BOX 14
+    config.poison_rate = 1.0
+    config.trigger = Backdoor.TRIGGER_SM_BOX_MED
+    config.target = Backdoor.TARGET_FA
+    main(config=config)
+    # Trigger: STOP SIGN 14
+    config.poison_rate = 1.0
+    config.trigger = Backdoor.TRIGGER_SM_STOP_SIGN
+    config.target = Backdoor.TARGET_FEDORA_HAT
+    main(config=config)
+    # Trigger: GLASSES
+    config.poison_rate = 1.0
+    config.trigger = Backdoor.TRIGGER_GLASSES
+    config.target = Backdoor.TARGET_CAT
+    main(config=config)

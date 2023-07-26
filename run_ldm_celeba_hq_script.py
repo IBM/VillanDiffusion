@@ -4,18 +4,20 @@ from dataset import Backdoor
 from dataset import DatasetLoader
 from model import DiffuserModelSched
 
+"""
+python VillanDiffusion.py --postfix new-set --p
+roject default --mode train --dataset CELEBA-HQ-LATENT --dataset_load_mode NONE --sde_type SDE-L
+DM --learning_rate 0.0002 --sched UNIPC-SCHED --infer_steps 20 --batch 16 --epoch 2000 --clean_rate 1 --
+poison_rate 0.9 --trigger GLASSES --target CAT --solver_type ode --psi 1 --vp_scale 1.0 --ve_scale 1.0 -
+-ckpt LDM-CELEBA-HQ-256 --fclip o --save_image_epochs 1 --save_model_epochs 1 --result exp_GenBadDiffusi
+on_LDM_BadDiff_ODE -o --gpu 1
+"""
+
 if __name__ == "__main__":
-    # project: str = 'LDM_BadDiff_ODE_400EP_FP16'
     result_dir: str = 'exp_GenBadDiffusion_LDM_BadDiff_ODE'
     epoch: int = 2000
-    trigger: str = Backdoor.TRIGGER_SM_STOP_SIGN
-    target: str = Backdoor.TARGET_FEDORA_HAT
-    # exp_ls = list(set(glob.glob(f"{result_dir}/res_*{epoch}*{trigger}*{target}*")))
-    exp_ls = [
-        f"{result_dir}/res_LDM-CELEBA-HQ-256_CELEBA-HQ-LATENT_ep2000_ode_c1.0_p0.3_SM_STOP_SIGN-FEDORA_HAT_psi1.0_lr0.0002_vp1.0_ve1.0_new-set",
-        f"{result_dir}/res_LDM-CELEBA-HQ-256_CELEBA-HQ-LATENT_ep2000_ode_c1.0_p0.5_SM_STOP_SIGN-FEDORA_HAT_psi1.0_lr0.0002_vp1.0_ve1.0_new-set",
-        f"{result_dir}/res_LDM-CELEBA-HQ-256_CELEBA-HQ-LATENT_ep2000_ode_c1.0_p0.7_SM_STOP_SIGN-FEDORA_HAT_psi1.0_lr0.0002_vp1.0_ve1.0_new-set",
-    ]
+    trigger: str = Backdoor.TRIGGER_GLASSES
+    target: str = Backdoor.TARGET_CAT
 
     project: str = 'default'
 
@@ -53,7 +55,7 @@ if __name__ == "__main__":
                     '': ['-o'],
                 },
                 'Async':{
-                    '--gpu': ['0,1']
+                    '--gpu': ['1']
                 }
             }, 
         },

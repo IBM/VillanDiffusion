@@ -43,6 +43,7 @@ DEFAULT_LEARNING_RATE_32: float = 2e-4
 DEFAULT_LEARNING_RATE_256: float = 6e-5
 DEFAULT_CLEAN_RATE: float = 1.0
 DEFAULT_POISON_RATE: float = 0.007
+DEFAULT_EXTEND_POISON_RATE: float = 0.0
 DEFAULT_TRIGGER: str = Backdoor.TRIGGER_SM_BOX
 DEFAULT_TARGET: str = Backdoor.TARGET_BOX
 DEFAULT_DATASET_LOAD_MODE: str = DatasetLoader.MODE_FIXED
@@ -88,9 +89,10 @@ def parse_args():
     parser.add_argument('--learning_rate', '-lr', type=float, help=f"Learning rate, default for 32 * 32 image: {DEFAULT_LEARNING_RATE_32}, default for larger images: {DEFAULT_LEARNING_RATE_256}")
     parser.add_argument('--clean_rate', '-cr', type=float, help=f"Clean rate, default for train: {DEFAULT_CLEAN_RATE}")
     parser.add_argument('--poison_rate', '-pr', type=float, help=f"Poison rate, default for train: {DEFAULT_POISON_RATE}")
+    parser.add_argument('--ext_poison_rate', '-epr', type=float, help=f"Poison rate for extend backdoor dataset, default for train: {DEFAULT_EXTEND_POISON_RATE}")
     parser.add_argument('--trigger', '-tr', type=str, help=f"Trigger pattern, default for train: {DEFAULT_TRIGGER}")
     parser.add_argument('--target', '-ta', type=str, help=f"Target pattern, default for train: {DEFAULT_TARGET}")
-    parser.add_argument('--dataset_load_mode', '-dlm', type=str, help=f"Mode of loading dataset, default for train: {DEFAULT_DATASET_LOAD_MODE}", choices=[DatasetLoader.MODE_FIXED, DatasetLoader.MODE_FLEX, DatasetLoader.MODE_NONE])
+    parser.add_argument('--dataset_load_mode', '-dlm', type=str, help=f"Mode of loading dataset, default for train: {DEFAULT_DATASET_LOAD_MODE}", choices=[DatasetLoader.MODE_FIXED, DatasetLoader.MODE_FLEX, DatasetLoader.MODE_EXTEND, DatasetLoader.MODE_NONE])
     parser.add_argument('--solver_type', '-solt', type=str, help=f"Target solver type of backdoor training, default for train: {DEFAULT_SOLVER_TYPE}", choices=['sde', 'ode'])
     parser.add_argument('--sde_type', '-sdet', type=str, help=f"Diffusion model type, default for train: {DEFAULT_SDE_TYPE}", choices=["SDE-VP", "SDE-VE", "SDE-LDM"])
     parser.add_argument('--psi', '-ps', type=float, help=f"Backdoor scheduler type, value between [1, 0], default for train: {DEFAULT_PSI}")
@@ -99,6 +101,7 @@ def parse_args():
     parser.add_argument('--gpu', '-g', type=str, help=f"GPU usage, default for train/resume: {DEFAULT_GPU}")
     parser.add_argument('--ckpt', '-c', type=str, help=f"Load from the checkpoint, default: {DEFAULT_CKPT}")
     parser.add_argument('--overwrite', '-o', action='store_true', help=f"Overwrite the existed training result or not, default for train/resume: {DEFAULT_CKPT}")
+    parser.add_argument('--R_trigger_only', '-trigonly', action='store_true', help="Making poisoned image without clean images")
     parser.add_argument('--postfix', '-p', type=str, help=f"Postfix of the name of the result folder, default for train/resume: {DEFAULT_POSTFIX}")
     parser.add_argument('--fclip', '-fc', type=str, help=f"Force to clip in each step or not during sampling/measure, default for train/resume: {DEFAULT_FCLIP}", choices=['w', 'o'])
     parser.add_argument('--save_image_epochs', '-sie', type=int, help=f"Save sampled image per epochs, default: {DEFAULT_SAVE_IMAGE_EPOCHS}")
@@ -106,6 +109,7 @@ def parse_args():
     parser.add_argument('--is_save_all_model_epochs', '-isame', action='store_true', help=f"")
     parser.add_argument('--sample_ep', '-se', type=int, help=f"Select i-th epoch to sample/measure, if no specify, use the lastest saved model, default: {DEFAULT_SAMPLE_EPOCH}")
     parser.add_argument('--result', '-res', type=str, help=f"Output file path, default: {DEFAULT_RESULT}")
+    
 
     args = parser.parse_args()
     
@@ -130,6 +134,7 @@ class TrainingConfig:
     learning_rate: float = DEFAULT_LEARNING_RATE
     clean_rate: float = DEFAULT_CLEAN_RATE
     poison_rate: float = DEFAULT_POISON_RATE
+    ext_poison_rate: float = DEFAULT_EXTEND_POISON_RATE
     trigger: str = DEFAULT_TRIGGER
     target: str = DEFAULT_TARGET
     dataset_load_mode: str = DEFAULT_DATASET_LOAD_MODE
@@ -181,7 +186,7 @@ def naming_fn(config: TrainingConfig):
     add_on: str = ""
     # add_on += "_clip" if config.clip else ""
     add_on += f"_{config.postfix}" if config.postfix else ""
-    return f'res_{config.ckpt}_{config.dataset}_ep{config.epoch}_{config.solver_type}_c{config.clean_rate}_p{config.poison_rate}_{config.trigger}-{config.target}_psi{config.psi}_lr{config.learning_rate}_vp{config.vp_scale}_ve{config.ve_scale}{add_on}'
+    return f'res_{config.ckpt}_{config.dataset}_ep{config.epoch}_{config.solver_type}_c{config.clean_rate}_p{config.poison_rate}_epr{config.ext_poison_rate}_{config.trigger}-{config.target}_psi{config.psi}_lr{config.learning_rate}_vp{config.vp_scale}_ve{config.ve_scale}{add_on}'
 
 def read_json(args: argparse.Namespace, file: str):
     with open(os.path.join(args.ckpt, file), "r") as f:
@@ -398,7 +403,7 @@ def get_data_loader(config: TrainingConfig):
     else:
         raise NotImplementedError(f"sde_type: {config.sde_type} isn't implemented")
     
-    dsl = DatasetLoader(root=ds_root, name=config.dataset, batch_size=config.batch, vmin=vmin, vmax=vmax).set_poison(trigger_type=config.trigger, target_type=config.target, clean_rate=config.clean_rate, poison_rate=config.poison_rate).prepare_dataset(mode=config.dataset_load_mode)
+    dsl = DatasetLoader(root=ds_root, name=config.dataset, batch_size=config.batch, vmin=vmin, vmax=vmax).set_poison(trigger_type=config.trigger, target_type=config.target, clean_rate=config.clean_rate, poison_rate=config.poison_rate, ext_poison_rate=config.ext_poison_rate).prepare_dataset(mode=config.dataset_load_mode, R_trigger_only=config.R_trigger_only)
     print(f"datasetloader len: {len(dsl)}")
     return dsl
 

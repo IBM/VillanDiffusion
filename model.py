@@ -592,8 +592,8 @@ class DiffuserModelSched():
             unet = accelerate.unwrap_model(unet)
             if vae != None:
                 vae = accelerate.unwrap_model(vae)
-                return pipeline(unet, vae, scheduler)
-            return pipeline(unet, scheduler)
+                return pipeline(vqvae=vae, unet=unet, scheduler=scheduler)
+            return pipeline(unet=unet, scheduler=scheduler)
         return get_pipeline
     @staticmethod
     def __get_model_sched_vp(ckpt_id: str, clip_sample: bool, noise_sched_type: str=None, clip_sample_range: float=None):
