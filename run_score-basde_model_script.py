@@ -51,7 +51,7 @@ if __name__ == "__main__":
                     '--result': [result_dir],
                     '': ['-o --R_trigger_only'],
                     # '': ['-o --trigger_augment'],
-                    '': ['-o'],
+                    # '': ['-o'],
                 },
                 'Async':{
                     '--gpu': gpu_ids
