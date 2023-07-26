@@ -69,7 +69,7 @@ MODE_RESUME_OPTS = ['project', 'task', 'sched', 'infer_steps', 'mode', 'gpu', 'c
 MODE_SAMPLING_OPTS = ['project', 'task', 'sched', 'infer_steps', 'mode', 'eval_max_batch', 'gpu', 'fclip', 'ckpt', 'sample_ep', 'infer_start', 'inpaint_mul']
 MODE_MEASURE_OPTS = ['project', 'task', 'sched', 'infer_steps', 'mode', 'eval_max_batch', 'gpu', 'fclip', 'ckpt', 'sample_ep', 'infer_start', 'inpaint_mul']
 # IGNORE_ARGS = ['overwrite']
-IGNORE_ARGS = ['overwrite', 'is_save_all_model_epochs']
+IGNORE_ARGS = ['overwrite', 'is_save_all_model_epochs', 'R_trigger_only']
 
 def parse_args():
     parser = argparse.ArgumentParser(description=globals()['__doc__'])
@@ -403,7 +403,10 @@ def get_data_loader(config: TrainingConfig):
     else:
         raise NotImplementedError(f"sde_type: {config.sde_type} isn't implemented")
     
-    dsl = DatasetLoader(root=ds_root, name=config.dataset, batch_size=config.batch, vmin=vmin, vmax=vmax).set_poison(trigger_type=config.trigger, target_type=config.target, clean_rate=config.clean_rate, poison_rate=config.poison_rate, ext_poison_rate=config.ext_poison_rate).prepare_dataset(mode=config.dataset_load_mode, R_trigger_only=config.R_trigger_only)
+    if hasattr(config, 'R_trigger_only'):
+        dsl = DatasetLoader(root=ds_root, name=config.dataset, batch_size=config.batch, vmin=vmin, vmax=vmax).set_poison(trigger_type=config.trigger, target_type=config.target, clean_rate=config.clean_rate, poison_rate=config.poison_rate, ext_poison_rate=config.ext_poison_rate).prepare_dataset(mode=config.dataset_load_mode, R_trigger_only=config.R_trigger_only)
+    else:
+        dsl = DatasetLoader(root=ds_root, name=config.dataset, batch_size=config.batch, vmin=vmin, vmax=vmax).set_poison(trigger_type=config.trigger, target_type=config.target, clean_rate=config.clean_rate, poison_rate=config.poison_rate, ext_poison_rate=config.ext_poison_rate).prepare_dataset(mode=config.dataset_load_mode)
     print(f"datasetloader len: {len(dsl)}")
     return dsl
 
