@@ -76,6 +76,28 @@ to generate the samples
 python VillanDiffusion.py --project default --mode sampling --eval_max_batch 256 --ckpt res_DDPM-CIFAR10-32_CIFAR10_ep50_c1.0_p0.1_BOX_14-HAT --fclip o --gpu 0
 ```
 
+To train LDM models, you can run following command or run ``python run_ldm_celeba_hq_script.py``.
+
+```bash
+python VillanDiffusion.py --postfix new-set --p
+roject default --mode train --dataset CELEBA-HQ-LATENT --dataset_load_mode NONE --sde_type SDE-L
+DM --learning_rate 0.0002 --sched UNIPC-SCHED --infer_steps 20 --batch 16 --epoch 2000 --clean_rate 1 --
+poison_rate 0.9 --trigger GLASSES --target CAT --solver_type ode --psi 1 --vp_scale 1.0 --ve_scale 1.0 -
+-ckpt LDM-CELEBA-HQ-256 --fclip o --save_image_epochs 1 --save_model_epochs 1 --result exp_GenBadDiffusi
+on_LDM_BadDiff_ODE -o --gpu 1
+```
+
+To train Score-Based models, you can run following command or run ``python run_ldm_celeba_hq_script.py``.
+
+```bash
+python VillanDiffusion.py --postfix new-set --p
+roject default --mode train --dataset CELEBA-HQ-LATENT --dataset_load_mode NONE --sde_type SDE-L
+DM --learning_rate 0.0002 --sched UNIPC-SCHED --infer_steps 20 --batch 16 --epoch 2000 --clean_rate 1 --
+poison_rate 0.9 --trigger GLASSES --target CAT --solver_type ode --psi 1 --vp_scale 1.0 --ve_scale 1.0 -
+-ckpt LDM-CELEBA-HQ-256 --fclip o --save_image_epochs 1 --save_model_epochs 1 --result exp_GenBadDiffusi
+on_LDM_BadDiff_ODE -o --gpu 1
+```
+
 ### Backdoor Conditional Diffusion Models with VillanDiffusion
 
 - ``--pretrained_model_name_or_path``: Specify the backdoor model. We recommend to use ``CompVis/stable-diffusion-v1-4``.
