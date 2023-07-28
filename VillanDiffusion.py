@@ -888,7 +888,12 @@ def measure_inpaints(config: TrainingConfig, pipeline, dsl: DatasetLoader) -> Tu
     
     # Target
     reps = ([config.measure_sample_n] + ([1] * (len(dsl.target.shape))))
-    backdoor_targets = torch.squeeze((dsl.target.repeat(*reps) / 2 + 0.5).clamp(0, 1)).to(config.device_ids[0])
+    
+    if config.sde_type == DiffuserModelSched.SDE_VE:
+        backdoor_targets = torch.squeeze((dsl.target.repeat(*reps)).clamp(0, 1)).to(device)
+    else:
+        backdoor_targets = torch.squeeze((dsl.target.repeat(*reps) / 2 + 0.5).clamp(0, 1)).to(device)
+    # backdoor_targets = torch.squeeze((dsl.target.repeat(*reps) / 2 + 0.5).clamp(0, 1)).to(config.device_ids[0])
     # Sample Poisoned Samples
     poisoned_imgs = dsl.get_poisoned(imgs)
     
@@ -1049,7 +1054,11 @@ def measure(config: TrainingConfig, accelerator: Accelerator, dataset_loader: Da
             gen_backdoor_target = ImagePathDataset(path=backdoor_path)[:].to(device)
             
             reps = ([len(gen_backdoor_target)] + ([1] * (len(dsl.target.shape))))
-            backdoor_target = torch.squeeze((dsl.target.repeat(*reps) / 2 + 0.5).clamp(0, 1)).to(device)
+            if config.sde_type == DiffuserModelSched.SDE_VE:
+                backdoor_target = torch.squeeze((dsl.target.repeat(*reps)).clamp(0, 1)).to(device)
+            else:
+                backdoor_target = torch.squeeze((dsl.target.repeat(*reps) / 2 + 0.5).clamp(0, 1)).to(device)
+            # backdoor_target = torch.squeeze((dsl.target.repeat(*reps) / 2 + 0.5).clamp(0, 1)).to(device)
             
             print(f"gen_backdoor_target: {gen_backdoor_target.shape}, vmax: {torch.max(gen_backdoor_target)}, vmin: {torch.min(backdoor_target)} | backdoor_target: {backdoor_target.shape}, vmax: {torch.max(backdoor_target)}, vmin: {torch.min(backdoor_target)}")
             # mse_sc = float(nn.MSELoss(reduction='mean')(gen_backdoor_target, backdoor_target))
