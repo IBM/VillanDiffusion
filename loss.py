@@ -631,8 +631,8 @@ def get_R_coef_elbo_gen(noise_sched, sde_type: str="vp", psi: float=1, solver_ty
         step, R_coef = get_R_coef_gen_ve(sigmas=sigmas, rhos_hat=rhos_hat, ws=ws, hs=hs, psi=psi, solver_type=solver_type, vp_scale=vp_scale, ve_scale=ve_scale)
         # R_coef = - R_coef / sigmas
         step, R_coef = step.flip(dims=[0]), R_coef.flip(dims=[0])
-        print(f"step: {torch.isnan(step).any()}, Min: {step.min()}, Max: {step.max()}: {step}")
-        print(f"R_coef: {torch.isnan(R_coef).any()}, Min: {R_coef.min()}, Max: {R_coef.max()}: {R_coef}")
+        # print(f"step: {torch.isnan(step).any()}, Min: {step.min()}, Max: {step.max()}: {step}")
+        # print(f"R_coef: {torch.isnan(R_coef).any()}, Min: {R_coef.min()}, Max: {R_coef.max()}: {R_coef}")
     else:
         raise NotImplementedError(f"sde_type: {sde_type} isn't implemented")
     
