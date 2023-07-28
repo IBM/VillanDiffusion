@@ -11,7 +11,7 @@ if __name__ == "__main__":
     gpu_ids: List[str] = ['0']
     # project: str = "Poison_Rates_NCSNPP_TrojDiff_SDE_Std_FLEX"
     result_dir: str = 'exp_GenBadDiffusion_NCSNPP_CIFAR10_TrojDiff_SDE_FLEX'
-    epoch: int = 100
+    epoch: int = 30
 
     project: str = 'default'
     
@@ -33,9 +33,13 @@ if __name__ == "__main__":
                     '--sde_type': ['SDE-VE'],
                     '--batch': [128],
                     '--epoch': [epoch],
+                    # '--clean_rate': [1.0],
+                    # '--poison_rate': [9.0],
+                    # '--ext_poison_rate': [1.0],
+                    # '--dataset_load_mode': [DatasetLoader.MODE_EXTEND],
                     '--clean_rate': [1.0],
-                    '--poison_rate': [9.0],
-                    '--dataset_load_mode': [DatasetLoader.MODE_EXTEND],
+                    '--poison_rate': [0.98],
+                    '--dataset_load_mode': [DatasetLoader.MODE_FIXED],
                     '--trigger': [Backdoor.TRIGGER_SM_STOP_SIGN],
                     '--target': [Backdoor.TARGET_FEDORA_HAT],
                     # '--rhos_hat_w': [1.0],
