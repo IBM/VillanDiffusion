@@ -366,7 +366,8 @@ class LatentDataset(torch.utils.data.Dataset):
         return self
     
     def __len__(self):
-        return self.__len
+        p = self.__get_list_dir_path(dir=self.__get_data_list_dir(self.__used_raw))
+        return len([file for file in glob.glob(os.path.join(p, f"*{LatentDataset.DATA_EXT}"))])
     
     def __getitem__(self, i: int):
         i = i % len(self)
@@ -411,7 +412,20 @@ def generate_latents_dataset(config: TrainingConfig, lds: LatentDataset, dsl: Da
         pbar.update(1)
     pbar.close()
     
-def main(config: TrainingConfig):
+def generate_raw_latents_dataset(config: TrainingConfig, lds: LatentDataset, dsl: DatasetLoader):
+    print(f"dsl.target: {dsl.target.shape}")
+    lds.update_target_by_key(key=config.target, val=dsl.target)
+    dl: DataLoader  = dsl.get_dataloader(shuffle=False)
+    
+    pbar = tqdm(total=len(dl))
+    for i, batch in enumerate(dl):
+        idxs: List[int] = [i for i in range(i * config.batch_size, (i + 1) * config.batch_size)]
+        # lds.update_data_by_idxs(data_type=config.trigger, idxs=idxs, vals=batch[DatasetLoader.PIXEL_VALUES])
+        lds.update_data_by_idxs(data_type='raw', idxs=idxs, vals=batch[DatasetLoader.IMAGE])
+        pbar.update(1)
+    pbar.close()
+    
+def main(config: TrainingConfig, is_raw: bool):
     config: TrainingConfig = TrainingConfig()
     ds_root = os.path.join('datasets')
     idx: int = -29000
@@ -428,7 +442,10 @@ def main(config: TrainingConfig):
     
     lds: LatentDataset = LatentDataset(ds_root=os.path.join(ds_root, config.latent_dataset_dir))
     lds.set_vae(vae=vae).set_poison(target_key=config.target, poison_key=config.trigger, raw='raw', poison_rate=0.7, use_latent=True).set_use_names(target=DatasetLoader.TARGET, poison=DatasetLoader.PIXEL_VALUES, raw=DatasetLoader.IMAGE)
-    generate_latents_dataset(config=config, lds=lds, dsl=dsl)
+    if is_raw:
+        generate_raw_latents_dataset(config=config, lds=lds, dsl=dsl)
+    else:
+        generate_latents_dataset(config=config, lds=lds, dsl=dsl)
     print(f"lds: {lds}, len: {len(lds)}")
     print(f"lds target: {lds.get_target()}")
     print(f"lds[{idx}]: {lds[idx]}")
@@ -439,21 +456,22 @@ def main(config: TrainingConfig):
 if __name__ == '__main__':
     config: TrainingConfig = TrainingConfig()
     
+    # Raw
     config.poison_rate = 0.0
     config.trigger = Backdoor.TRIGGER_NONE
-    main(config=config)
+    main(config=config, is_raw=True)
     # Trigger: BOX 14
     config.poison_rate = 1.0
     config.trigger = Backdoor.TRIGGER_SM_BOX_MED
     config.target = Backdoor.TARGET_FA
-    main(config=config)
+    main(config=config, is_raw=False)
     # Trigger: STOP SIGN 14
     config.poison_rate = 1.0
     config.trigger = Backdoor.TRIGGER_SM_STOP_SIGN
     config.target = Backdoor.TARGET_FEDORA_HAT
-    main(config=config)
+    main(config=config, is_raw=False)
     # Trigger: GLASSES
     config.poison_rate = 1.0
     config.trigger = Backdoor.TRIGGER_GLASSES
     config.target = Backdoor.TARGET_CAT
-    main(config=config)
+    main(config=config, is_raw=False)
