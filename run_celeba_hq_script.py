@@ -1,4 +1,4 @@
-import glob
+from glob import glob
 
 from scalablerunner.taskrunner import TaskRunner
 from dataset import Backdoor
@@ -6,10 +6,10 @@ from dataset import DatasetLoader
 from model import DiffuserModelSched
 
 if __name__ == "__main__":
-    epochs: int = 1500
+    epochs: int = 500
     project_name: str = 'default'
     result_dir: str = 'exp_GenBadDiffusion_CelebA-HQ_DDPM_BadDiff_ODE'
-    exp_ls = [f'{result_dir}/*']
+    exp_ls = glob(f'{result_dir}/*')
     config = {
         # Use script to train (Trigger, Target): (Backdoor.TRIGGER_GLASSES, Backdoor.TARGET_CAT)
         'CelebA-HQ Eye Glasses-Cat':{
@@ -53,7 +53,7 @@ if __name__ == "__main__":
                 'Param': {
                     '--project': [project_name],
                     '--mode': ['measure'],
-                    '--sched': [DiffuserModelSched.DEIS_SCHED],
+                    '--sched': [DiffuserModelSched.DEIS_SCHED, DiffuserModelSched.HEUN_SCHED],
                     '--infer_steps': [20],
                     '--eval_max_batch': [64],
                     '--ckpt': exp_ls, 
