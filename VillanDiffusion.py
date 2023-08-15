@@ -65,9 +65,9 @@ DEFAULT_RESULT: int = '.'
 
 NOT_MODE_TRAIN_OPTS = ['sample_ep']
 NOT_MODE_TRAIN_MEASURE_OPTS = ['sample_ep']
-MODE_RESUME_OPTS = ['project', 'task', 'sched', 'infer_steps', 'mode', 'gpu', 'ckpt']
-MODE_SAMPLING_OPTS = ['project', 'task', 'sched', 'infer_steps', 'mode', 'eval_max_batch', 'gpu', 'fclip', 'ckpt', 'sample_ep', 'infer_start', 'inpaint_mul']
-MODE_MEASURE_OPTS = ['project', 'task', 'sched', 'infer_steps', 'mode', 'eval_max_batch', 'gpu', 'fclip', 'ckpt', 'sample_ep', 'infer_start', 'inpaint_mul']
+MODE_RESUME_OPTS = ['project', 'task', 'sched', 'ddim_eta', 'infer_steps', 'mode', 'gpu', 'ckpt']
+MODE_SAMPLING_OPTS = ['project', 'task', 'sched', 'ddim_eta', 'infer_steps', 'mode', 'eval_max_batch', 'gpu', 'fclip', 'ckpt', 'sample_ep', 'infer_start', 'inpaint_mul']
+MODE_MEASURE_OPTS = ['project', 'task', 'sched', 'ddim_eta', 'infer_steps', 'mode', 'eval_max_batch', 'gpu', 'fclip', 'ckpt', 'sample_ep', 'infer_start', 'inpaint_mul']
 # IGNORE_ARGS = ['overwrite']
 IGNORE_ARGS = ['overwrite', 'is_save_all_model_epochs', 'R_trigger_only']
 
@@ -158,6 +158,7 @@ class TrainingConfig:
     # measure_sample_n: int = 1024
     measure_sample_n: int = 10000
     # measure_sample_n: int = 16
+    measure_inpaint_sample_n: int = 1024
     batch_32: int = 128
     batch_256: int = 64
     gradient_accumulation_steps: int = 1
@@ -414,7 +415,7 @@ def get_repo(config: TrainingConfig, accelerator: Accelerator):
     repo = None
     if accelerator.is_main_process:
         # if config.push_to_hub:
-            # repo = init_git_repo(config, at_init=True)
+        #     repo = init_git_repo(config, at_init=True)
         # accelerator.init_trackers(config.output_dir, config=config.__dict__)
         init_tracker(config=config, accelerator=accelerator)
     return repo
@@ -499,19 +500,38 @@ def get_encode_collate_fn(unet, vae):
 
 def init_train(config: TrainingConfig, dataset_loader: DatasetLoader):
     # Initialize accelerator and tensorboard logging
-    # accelerator = Accelerator(
-    #     mixed_precision=config.mixed_precision,
-    #     gradient_accumulation_steps=config.gradient_accumulation_steps, 
-    #     log_with=["tensorboard", "wandb"],
-    #     logging_dir=os.path.join(config.output_dir, "logs")
-    # )
+    accelerator = Accelerator(
+        mixed_precision=config.mixed_precision,
+        gradient_accumulation_steps=config.gradient_accumulation_steps, 
+        log_with="wandb",
+        logging_dir=os.path.join(config.output_dir, "logs")
+    )
     
     accelerator = get_accelerator(config=config)
     # repo = None
-    # if accelerator.is_main_process:
-    #     if config.push_to_hub:
-    #         repo = init_git_repo(config, at_init=True)
-    #     accelerator.init_trackers(config.output_dir, config=config.__dict__)
+    if accelerator.is_main_process:
+        # if config.push_to_hub:
+        #     repo = init_git_repo(config, at_init=True)
+        tracker_project: str = str(config.output_dir).split('/')[-1]
+        # print(f"Config: {config.__dict__}")
+        def convert_dict(config):
+            ret = {}
+            for key in config.__dict__.keys():
+                if config.__dict__[key] is None:
+                    # print(f"[{key}]: None")
+                    ret[key] = str(None)
+                elif isinstance(config.__dict__[key], (int, float, bool, str)) or torch.is_tensor(config.__dict__[key]):
+                    # print(f"[{key}]: {type(config.__dict__[key])}")
+                    ret[key] = config.__dict__[key]
+                elif isinstance(config.__dict__[key], list):
+                    str_ls: list[str] = []
+                    for item in config.__dict__[key]:
+                        str_ls.append(str(item))
+                    val = ",".join(str_ls)
+                    # print(f"[{key}]: {type(val)}")
+                    ret[key] = val
+            return ret
+        accelerator.init_trackers(tracker_project, config=convert_dict(config))
     repo = get_repo(config=config, accelerator=accelerator)
     
     model, vae, optimizer, lr_sched, noise_sched, cur_epoch, cur_step, get_pipeline = get_model_optim_sched(config=config, accelerator=accelerator, dataset_loader=dataset_loader)
@@ -554,6 +574,7 @@ def sampling(config: TrainingConfig, file_name: Union[int, str], pipeline):
         
         # Sample some images from random noise (this is the backward diffusion process).
         # The default pipeline output type is `List[PIL.Image]`
+        print(f"Pipeline: {type(pipeline)}")
         if config.ddim_eta == None:
             pipline_res = pipeline(num_inference_steps=config.infer_steps, start_from=start_from, batch_size=config.eval_sample_n, generator=torch.manual_seed(config.seed), init=init, save_every_step=True, output_type=None)
         else:
@@ -709,9 +730,11 @@ def update_score_file(config: TrainingConfig, score_file: str, fid_sc: float=Non
             res += f"_{config.sched}-{config.infer_steps}" if config.sched != None else ""
         if config.sched == DiffuserModelSched.DDIM_SCHED and config.ddim_eta != DEFAULT_DDIM_ETA:
             res += f"-eta{config.ddim_eta}"
-        res += f"_{config.measure_sample_n}"
         if config.task != TASK_GENERATE:
+            res += f"_{config.measure_inpaint_sample_n}"
             res += f"_{config.task}"
+        else:
+            res += f"_{config.measure_sample_n}"
         return res
     
     def get_key_non_gen(config: TrainingConfig, key: str) -> str:
@@ -874,20 +897,21 @@ class InpaintTaskScore:
     unpoisoned_noisy: InpaintScore
 
 def measure_inpaints(config: TrainingConfig, pipeline, dsl: DatasetLoader) -> Tuple[float, float, float]:
+    device = torch.device(config.device_ids[0])
     noise = torch.randn(
-                (config.measure_sample_n, pipeline.unet.in_channels, pipeline.unet.sample_size, pipeline.unet.sample_size),
+                (config.measure_inpaint_sample_n, pipeline.unet.in_channels, pipeline.unet.sample_size, pipeline.unet.sample_size),
                 generator=torch.manual_seed(config.seed),
             )
     # Special Sampling
     noise_sp = noise * 0.3
     imgs = []
     ds = dsl.get_dataset()
-    for idx in range(config.measure_sample_n):
+    for idx in range(config.measure_inpaint_sample_n):
         imgs.append(ds[-idx][DatasetLoader.IMAGE])
     imgs = torch.stack(imgs)
     
     # Target
-    reps = ([config.measure_sample_n] + ([1] * (len(dsl.target.shape))))
+    reps = ([config.measure_inpaint_sample_n] + ([1] * (len(dsl.target.shape))))
     
     if config.sde_type == DiffuserModelSched.SDE_VE:
         backdoor_targets = torch.squeeze((dsl.target.repeat(*reps)).clamp(0, 1)).to(device)

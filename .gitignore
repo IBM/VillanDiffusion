@@ -28,6 +28,7 @@ wandb/
 ANP_backdoor/
 Default/
 diffusers/
+measure
 
 !static/*
 NCSNPP_CIFAR10_scratch/
