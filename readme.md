@@ -99,6 +99,15 @@ poison_rate 0.9 --trigger GLASSES --target CAT --solver_type ode --psi 1 --vp_sc
 on_LDM_BadDiff_ODE -o --gpu 1
 ```
 
+To measure with inpainting task, you can run following instruction or run ``python run_measure_inpaint.py``
+
+```bash
+python VillanDiffusion.py --
+project default --mode measure --task poisoned_denoise --sched UNIPC-SCHED --infer_steps 20 --infer_start 10 --ckpt /w
+ork/u2941379/workspace/backdoor_diffusion/res_DDPM-CIFAR10-32_CIFAR10_ep100_ode_c1.0_p0.2_SM_STOP_SIGN-BOX_psi1.0_lr0.
+0002_vp1.0_ve1.0_new-set-1_test --fclip o --gpu 0
+```
+
 ### Backdoor Conditional Diffusion Models with VillanDiffusion
 
 - ``--pretrained_model_name_or_path``: Specify the backdoor model. We recommend to use ``CompVis/stable-diffusion-v1-4``.
