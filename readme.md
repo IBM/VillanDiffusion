@@ -45,6 +45,7 @@ Arguments
     - ``measure``: Compute the FID and MSE score for the VillanDiffusion from the saved checkpoint, the ground truth samples will be saved under the 'measure' folder automatically to compute the FID score.
     - ``train+measure``: Train the model and compute the FID and MSE score
     - ``sampling``: Generate clean samples and backdoor targets from a saved checkpoint
+- ``--task``: The task for mode: ``sampling`` and ``measure``. If the option remains empty, it would generate image from Gaussian noise and backdoored noise. Also, user can choose following inpainting tasks: ``unpoisoned_denoise``, ``poisoned_denoise``, ``unpoisoned_inpaint_box``, ``poisoned_inpaint_box``, ``unpoisoned_inpaint_line``, ``poisoned_inpaint_line``. **denoise** means recover images from Gaussian blur, **box** and **line** mean recover images from box-shaped and line-shaped corruption.
 - ``--sched``: Sampling algorithms for the diffusion models. Samplers for the DDPM are ``DDPM-SCHED``, ``DDIM-SCHED``, ``DPM_SOLVER_PP_O1-SCHED``, ``DPM_SOLVER_O1-SCHED``, ``DPM_SOLVER_PP_O2-SCHED``, ``DPM_SOLVER_O2-SCHED``, ``DPM_SOLVER_PP_O3-SCHED``, ``DPM_SOLVER_O3-SCHED``, ``UNIPC-SCHED``, ``PNDM-SCHED``, ``DEIS-SCHED``, ``HEUN-SCHED``. ``SCORE-SDE-VE-SCHED`` is used by score-based models.
 - ``--solver_type``: Backdoor for the ODE or SDE samplers. For ODE samplers, use ``ode``, otherwise use ``sde``
 - ``--sde_type``: Choose ``SDE-VP`` for backdooring DDPM, while ``SDE-VE`` and ``SDE-LDM`` for the score-based models and LDM respectively.
@@ -130,6 +131,7 @@ python viallanDiffusion_conditional.py --pretrained_model_name_or_path CompVis/s
 - ``--max_batch_n``: Sampling batch size
 - ``--sched``: Specify the sampler, choice: ``DPM_SOLVER_PP_O2_SCHED`` and ``None``
 - ``--num_inference_steps``: Number of the sampling steps, default: 25
+- ``--infer_start``: Start from which step
 - ``--base_path``: Sampling from the model under the specified path
 - ``--ckpt_step``: Checkpointing every X step
 - ``--gpu``: Specify GPU device
