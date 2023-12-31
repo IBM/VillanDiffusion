@@ -37,6 +37,12 @@ wandb login --relogin --cloud <API Key>
 - CIFAR10: Create a folder ``./measure/CIFAR10`` and put the images of CIFAR10 under the folder.
 - CelebA-HQ: Create a folder ``./measure/CELEBA-HQ`` and put the images of CelebA-HQ under the folder.
 
+### Pre-Trained Models
+
+I've uploaded all pre-trained backdoor diffusion models for [BadDiffusion](https://github.com/IBM/BadDiffusion) and [VillanDiffusion](https://github.com/IBM/VillanDiffusion) on [HuggingFace](https://huggingface.co/newsyctw). Please feel free to download backdoored diffusion models from it.
+
+Note that for training backdoor score-based models, you need to download the pre-trained clean model from [HuggingFace](https://huggingface.co/newsyctw/NCSN_CIFAR10_my) and put it under the working directory.
+
 ### Backdoor Unconditional Diffusion Models with VillanDiffusion
 
 Arguments
@@ -83,22 +89,15 @@ To train LDM models, you can run following command or run ``python run_ldm_celeb
 
 ```bash
 python VillanDiffusion.py --postfix new-set --p
-roject default --mode train --dataset CELEBA-HQ-LATENT --dataset_load_mode NONE --sde_type SDE-L
-DM --learning_rate 0.0002 --sched UNIPC-SCHED --infer_steps 20 --batch 16 --epoch 2000 --clean_rate 1 --
-poison_rate 0.9 --trigger GLASSES --target CAT --solver_type ode --psi 1 --vp_scale 1.0 --ve_scale 1.0 -
--ckpt LDM-CELEBA-HQ-256 --fclip o --save_image_epochs 1 --save_model_epochs 1 --result exp_GenBadDiffusi
-on_LDM_BadDiff_ODE -o --gpu 1
+roject default --mode train --dataset CELEBA-HQ-LATENT --dataset_load_mode NONE --sde_type SDE-LDM --learning_rate 0.0002 --sched UNIPC-SCHED --infer_steps 20 --batch 16 --epoch 2000 --clean_rate 1 --poison_rate 0.9 --trigger GLASSES --target CAT --solver_type ode --psi 1 --vp_scale 1.0 --ve_scale 1.0 --ckpt LDM-CELEBA-HQ-256 --fclip o --save_image_epochs 1 --save_model_epochs 1 --result exp_GenBadDiffusion_LDM_BadDiff_ODE -o --gpu 0
 ```
 
-To train Score-Based models, you can run following command or run ``python run_ldm_celeba_hq_script.py``.
+To train Score-Based models, you can run following command or run ``python run_score-basde_model_script.py``.
+
+Note that for training backdoor score-based models, you need to download the pre-trained clean model from [HuggingFace](https://huggingface.co/newsyctw/NCSN_CIFAR10_my) and put it under the working directory.
 
 ```bash
-python VillanDiffusion.py --postfix new-set --p
-roject default --mode train --dataset CELEBA-HQ-LATENT --dataset_load_mode NONE --sde_type SDE-L
-DM --learning_rate 0.0002 --sched UNIPC-SCHED --infer_steps 20 --batch 16 --epoch 2000 --clean_rate 1 --
-poison_rate 0.9 --trigger GLASSES --target CAT --solver_type ode --psi 1 --vp_scale 1.0 --ve_scale 1.0 -
--ckpt LDM-CELEBA-HQ-256 --fclip o --save_image_epochs 1 --save_model_epochs 1 --result exp_GenBadDiffusi
-on_LDM_BadDiff_ODE -o --gpu 1
+python VillanDiffusion.py --postfix flex_new-set --project default --mode train --learning_rate 2e-05 --dataset CIFAR10 --sde_type SDE-VE --batch 128 --epoch 30 --clean_rate 1.0 --poison_rate 0.98 --dataset_load_mode FIXED --trigger STOP_SIGN_14 --target HAT --solver_type sde --psi 0 --vp_scale 1.0 --ve_scale 1.0 --ckpt NCSN_CIFAR10_my --fclip o --save_image_epochs 5 --save_model_epochs 5 --result exp_GenBadDiffusion_NCSNPP_CIFAR10_TrojDiff_SDE_FLEX -o --R_trigger_only --gpu 0
 ```
 
 To measure with inpainting task, you can run following instruction or run ``python run_measure_inpaint.py``
