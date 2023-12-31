@@ -88,8 +88,7 @@ python VillanDiffusion.py --project default --mode sampling --eval_max_batch 256
 To train LDM models, you can run following command or run ``python run_ldm_celeba_hq_script.py``.
 
 ```bash
-python VillanDiffusion.py --postfix new-set --p
-roject default --mode train --dataset CELEBA-HQ-LATENT --dataset_load_mode NONE --sde_type SDE-LDM --learning_rate 0.0002 --sched UNIPC-SCHED --infer_steps 20 --batch 16 --epoch 2000 --clean_rate 1 --poison_rate 0.9 --trigger GLASSES --target CAT --solver_type ode --psi 1 --vp_scale 1.0 --ve_scale 1.0 --ckpt LDM-CELEBA-HQ-256 --fclip o --save_image_epochs 1 --save_model_epochs 1 --result exp_GenBadDiffusion_LDM_BadDiff_ODE -o --gpu 0
+python VillanDiffusion.py --postfix new-set --project default --mode train --dataset CELEBA-HQ-LATENT --dataset_load_mode NONE --sde_type SDE-LDM --learning_rate 0.0002 --sched UNIPC-SCHED --infer_steps 20 --batch 16 --epoch 2000 --clean_rate 1 --poison_rate 0.9 --trigger GLASSES --target CAT --solver_type ode --psi 1 --vp_scale 1.0 --ve_scale 1.0 --ckpt LDM-CELEBA-HQ-256 --fclip o --save_image_epochs 1 --save_model_epochs 1 --result exp_GenBadDiffusion_LDM_BadDiff_ODE -o --gpu 0
 ```
 
 To train Score-Based models, you can run following command or run ``python run_score-basde_model_script.py``.
@@ -103,10 +102,7 @@ python VillanDiffusion.py --postfix flex_new-set --project default --mode train 
 To measure with inpainting task, you can run following instruction or run ``python run_measure_inpaint.py``
 
 ```bash
-python VillanDiffusion.py --
-project default --mode measure --task poisoned_denoise --sched UNIPC-SCHED --infer_steps 20 --infer_start 10 --ckpt /w
-ork/u2941379/workspace/backdoor_diffusion/res_DDPM-CIFAR10-32_CIFAR10_ep100_ode_c1.0_p0.2_SM_STOP_SIGN-BOX_psi1.0_lr0.
-0002_vp1.0_ve1.0_new-set-1_test --fclip o --gpu 0
+python VillanDiffusion.py --project default --mode measure --task poisoned_denoise --sched UNIPC-SCHED --infer_steps 20 --infer_start 10 --ckpt /work/u2941379/workspace/backdoor_diffusion/res_DDPM-CIFAR10-32_CIFAR10_ep100_ode_c1.0_p0.2_SM_STOP_SIGN-BOX_psi1.0_lr0.0002_vp1.0_ve1.0_new-set-1_test --fclip o --gpu 0
 ```
 
 ### Backdoor Conditional Diffusion Models with VillanDiffusion
